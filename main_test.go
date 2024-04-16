@@ -3,18 +3,17 @@
 package main_test
 
 import (
+	"log"
 	"os"
 	"testing"
-    "log"
 
-    "net/http"
-    "net/http/httptest"
-    "strconv"
-    "encoding/json"
-    "bytes"
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 
-    "github.com/TomFern/go-mux-api"
-
+	"github.com/TomFern/go-mux-api"
 )
 
 var a main.App
@@ -22,15 +21,15 @@ var a main.App
 func TestMain(m *testing.M) {
 	a = main.App{}
 	a.Initialize(
-		os.Getenv("TEST_DB_USERNAME"),
-		os.Getenv("TEST_DB_PASSWORD"),
-		os.Getenv("TEST_DB_NAME"))
+		"postgres",
+		"postgres",
+		"postgres")
 
 	ensureTableExists()
 
 	code := m.Run()
 
-	clearTable()
+	clearProductTable()
 
 	os.Exit(code)
 }
@@ -39,9 +38,15 @@ func ensureTableExists() {
 	if _, err := a.DB.Exec(tableCreationQuery); err != nil {
 		log.Fatal(err)
 	}
+	if _, err := a.DB.Exec(tableCreationQuery2); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := a.DB.Exec(tableCreationQuery3); err != nil {
+		log.Fatal(err)
+	}
 }
 
-func clearTable() {
+func clearProductTable() {
 	a.DB.Exec("DELETE FROM products")
 	a.DB.Exec("ALTER SEQUENCE products_id_seq RESTART WITH 1")
 }
@@ -53,13 +58,33 @@ const tableCreationQuery = `CREATE TABLE IF NOT EXISTS products
     price NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     CONSTRAINT products_pkey PRIMARY KEY (id)
 )`
-
+const tableCreationQuery2 = `CREATE TABLE IF NOT EXISTS users
+(
+    id SERIAL,
+    name TEXT NOT NULL,
+    cartID NUMERIC DEFAULT -1,
+    CONSTRAINT user_pkey PRIMARY KEY (id)
+)`
+const tableCreationQuery3 = `CREATE TABLE IF NOT EXISTS carts
+(
+    id SERIAL,
+    userID NUMERIC NOT NULL,
+    products VARCHAR(100),
+    balance NUMERIC NOT NULL DEFAULT 0,
+    CONSTRAINT cart_pkey PRIMARY KEY (id)
+)`
 
 // tom: next functions added later, these require more modules: net/http net/http/httptest
-func TestEmptyTable(t *testing.T) {
-	clearTable()
+func TestEmptyTables(t *testing.T) {
+	clearProductTable()
+	clearUserTable()
 
-	req, _ := http.NewRequest("GET", "/products", nil)
+	EmptyTable("/users", t)
+	EmptyTable("/products", t)
+}
+
+func EmptyTable(s string, t *testing.T) {
+	req, _ := http.NewRequest("GET", s, nil)
 	response := executeRequest(req)
 
 	checkResponseCode(t, http.StatusOK, response.Code)
@@ -83,7 +108,7 @@ func checkResponseCode(t *testing.T, expected, actual int) {
 }
 
 func TestGetNonExistentProduct(t *testing.T) {
-	clearTable()
+	clearProductTable()
 
 	req, _ := http.NewRequest("GET", "/product/11", nil)
 	response := executeRequest(req)
@@ -99,12 +124,10 @@ func TestGetNonExistentProduct(t *testing.T) {
 
 // tom: rewritten function
 func TestCreateProduct(t *testing.T) {
-
-	clearTable()
-
-    var jsonStr = []byte(`{"name":"test product", "price": 11.22}`)
-    req, _ := http.NewRequest("POST", "/product", bytes.NewBuffer(jsonStr))
-    req.Header.Set("Content-Type", "application/json")
+	clearProductTable()
+	var jsonStr = []byte(`{"name":"test product", "price": 11.22}`)
+	req, _ := http.NewRequest("POST", "/product", bytes.NewBuffer(jsonStr))
+	req.Header.Set("Content-Type", "application/json")
 
 	response := executeRequest(req)
 	checkResponseCode(t, http.StatusCreated, response.Code)
@@ -127,9 +150,8 @@ func TestCreateProduct(t *testing.T) {
 	}
 }
 
-
 func TestGetProduct(t *testing.T) {
-	clearTable()
+	clearProductTable()
 	addProducts(1)
 
 	req, _ := http.NewRequest("GET", "/product/1", nil)
@@ -150,7 +172,7 @@ func addProducts(count int) {
 
 func TestUpdateProduct(t *testing.T) {
 
-	clearTable()
+	clearProductTable()
 	addProducts(1)
 
 	req, _ := http.NewRequest("GET", "/product/1", nil)
@@ -158,9 +180,9 @@ func TestUpdateProduct(t *testing.T) {
 	var originalProduct map[string]interface{}
 	json.Unmarshal(response.Body.Bytes(), &originalProduct)
 
-    var jsonStr = []byte(`{"name":"test product - updated name", "price": 11.22}`)
-    req, _ = http.NewRequest("PUT", "/product/1", bytes.NewBuffer(jsonStr))
-    req.Header.Set("Content-Type", "application/json")
+	var jsonStr = []byte(`{"name":"test product - updated name", "price": 11.22}`)
+	req, _ = http.NewRequest("PUT", "/product/1", bytes.NewBuffer(jsonStr))
+	req.Header.Set("Content-Type", "application/json")
 
 	// req, _ = http.NewRequest("PUT", "/product/1", bytes.NewBuffer(payload))
 	response = executeRequest(req)
@@ -184,7 +206,7 @@ func TestUpdateProduct(t *testing.T) {
 }
 
 func TestDeleteProduct(t *testing.T) {
-	clearTable()
+	clearProductTable()
 	addProducts(1)
 
 	req, _ := http.NewRequest("GET", "/product/1", nil)
