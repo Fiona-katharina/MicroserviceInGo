@@ -13,7 +13,6 @@ env:
   APP_DB_USERNAME: postgres
   APP_DB_PASSWORD: postgres
   APP_DB_NAME: postgres
-  GIT_SHA : 'git rev-parse --short HEAD'
 
 jobs:
 
@@ -76,5 +75,5 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: fiona24/app:latest,fiona24/app:${GIT_SHA}
+          tags: fiona24/app:latest,fiona24/app:${{github.sha}}
 
