@@ -77,3 +77,11 @@ jobs:
           push: true
           tags: fiona24/app:latest,fiona24/app:${{github.sha}}
 
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'docker.io/fiona24/app:${{github.sha}}'
+          format: 'table'
+          exit-code: '1'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
