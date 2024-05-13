@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"github.com/lib/pq"
-	"log/slog"
 )
 
 type user struct {
@@ -38,7 +37,6 @@ func (u *user) createUser(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	slog.Debug("Created user")
 	//var c = new(cart)
 	var itms []int
 	err = db.QueryRow(
